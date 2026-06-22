@@ -16,6 +16,7 @@ The overlay displays a 1-100 microphone level bar, a configurable threshold mark
 - Adjustable threshold from 1 to 100
 - Microphone selection with duplicate Windows audio backend filtering
 - Saved selected microphone
+- Optional launch at Windows sign-in
 - System tray icon with:
   - Show Settings
   - Show Indicator
@@ -49,7 +50,7 @@ py voice_threshold_overlay.py
 
 ## Settings
 
-The settings window lets you select the microphone, refresh the device list, adjust the warning threshold, and view the current detected level.
+The settings window lets you select the microphone, refresh the device list, adjust the warning threshold, enable launch at Windows sign-in, and view the current detected level.
 
 `sounddevice` may report the same physical microphone through multiple Windows audio backends. The app prefers Windows WASAPI inputs and hides duplicate backend entries when possible.
 
@@ -62,3 +63,9 @@ Settings are saved to:
 ```
 
 The config stores overlay position, overlay size, overlay visibility, threshold, and selected microphone details.
+
+The `Start with Windows` setting is stored in the current user's Windows startup registry key:
+
+```text
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+```

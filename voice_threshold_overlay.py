@@ -7,6 +7,7 @@ import threading
 import time
 import tkinter as tk
 from tkinter import ttk
+import winreg
 
 import numpy as np
 import pystray
@@ -15,8 +16,10 @@ from PIL import Image, ImageDraw
 
 
 APP_NAME = "Voice Threshold Overlay"
+STARTUP_APP_NAME = "VoiceThresholdOverlay"
 CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), APP_NAME)
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
+STARTUP_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 DEFAULT_CONFIG = {
     "overlay": {"x": 120, "y": 680, "width": 360, "height": 54, "visible": True},
@@ -55,6 +58,39 @@ def save_config(config):
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
     os.replace(tmp_path, CONFIG_PATH)
+
+
+def startup_command():
+    script_path = os.path.abspath(__file__)
+    return f'"{sys.executable}" "{script_path}"'
+
+
+def is_startup_enabled():
+    if sys.platform != "win32":
+        return False
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, STARTUP_REG_PATH, 0, winreg.KEY_READ) as key:
+            command, _ = winreg.QueryValueEx(key, STARTUP_APP_NAME)
+        return os.path.normcase(os.path.abspath(__file__)) in os.path.normcase(command)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+
+
+def set_startup_enabled(enabled):
+    if sys.platform != "win32":
+        return
+
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, STARTUP_REG_PATH, 0, winreg.KEY_SET_VALUE) as key:
+        if enabled:
+            winreg.SetValueEx(key, STARTUP_APP_NAME, 0, winreg.REG_SZ, startup_command())
+        else:
+            try:
+                winreg.DeleteValue(key, STARTUP_APP_NAME)
+            except FileNotFoundError:
+                pass
 
 
 def hide_from_alt_tab(window):
@@ -261,6 +297,7 @@ class VoiceThresholdOverlay:
         self.threshold_var = tk.IntVar(value=int(self.config.get("threshold", 65)))
         self.level_var = tk.StringVar(value="1")
         self.device_var = tk.StringVar(value="")
+        self.startup_var = tk.BooleanVar(value=is_startup_enabled())
         self.error_var = tk.StringVar(value="")
 
         self.audio = AudioMonitor(self.set_audio_error)
@@ -496,7 +533,7 @@ class VoiceThresholdOverlay:
     def create_settings(self):
         self.settings = tk.Toplevel(self.root)
         self.settings.title(APP_NAME + " Settings")
-        self.settings.geometry("440x320")
+        self.settings.geometry("440x350")
         self.settings.resizable(False, False)
         self.settings.protocol("WM_DELETE_WINDOW", self.settings.withdraw)
 
@@ -523,9 +560,16 @@ class VoiceThresholdOverlay:
         )
         slider.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 14))
 
-        ttk.Label(frame, text="Current level").grid(row=4, column=0, sticky="w")
+        ttk.Checkbutton(
+            frame,
+            text="Start with Windows",
+            variable=self.startup_var,
+            command=self.toggle_startup,
+        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 12))
+
+        ttk.Label(frame, text="Current level").grid(row=5, column=0, sticky="w")
         ttk.Label(frame, textvariable=self.level_var, font=("Segoe UI", 18, "bold")).grid(
-            row=5, column=0, sticky="w", pady=(2, 12)
+            row=6, column=0, sticky="w", pady=(2, 12)
         )
 
         ttk.Label(
@@ -537,10 +581,10 @@ class VoiceThresholdOverlay:
                 "Double-click or right-click opens this panel."
             ),
             justify="left",
-        ).grid(row=6, column=0, columnspan=2, sticky="w", pady=(0, 12))
+        ).grid(row=7, column=0, columnspan=2, sticky="w", pady=(0, 12))
 
         error = ttk.Label(frame, textvariable=self.error_var, foreground="#b00020", wraplength=380)
-        error.grid(row=7, column=0, columnspan=2, sticky="ew")
+        error.grid(row=8, column=0, columnspan=2, sticky="ew")
 
         frame.columnconfigure(0, weight=1)
         hide_from_alt_tab(self.settings)
@@ -548,6 +592,14 @@ class VoiceThresholdOverlay:
     def threshold_changed(self, value):
         self.threshold_var.set(max(1, min(100, int(float(value)))))
         self.save_current_config()
+
+    def toggle_startup(self):
+        try:
+            set_startup_enabled(self.startup_var.get())
+            self.error_var.set("")
+        except OSError as exc:
+            self.startup_var.set(is_startup_enabled())
+            self.error_var.set(f"Could not update Windows startup setting: {exc}")
 
     def refresh_microphones(self):
         previous = self.device_var.get()
