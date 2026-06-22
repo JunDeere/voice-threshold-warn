@@ -22,7 +22,7 @@ The overlay displays a 1-100 microphone level bar, a configurable threshold mark
   - Show Indicator
   - Hide Indicator
   - Exit
-- Config saved under the user's AppData folder
+- Config saved under the user's Documents folder
 
 ## Requirements
 
@@ -59,10 +59,10 @@ The settings window lets you select the microphone, refresh the device list, adj
 Settings are saved to:
 
 ```text
-%APPDATA%\Voice Threshold Overlay\config.json
+%USERPROFILE%\Documents\Voice Threshold Overlay\config.json
 ```
 
-The config stores overlay position, overlay size, overlay visibility, threshold, and selected microphone details.
+The config stores overlay position, overlay size, overlay visibility, threshold, and selected microphone details. On first launch after upgrading from an older version, the app will copy settings from the previous AppData config if the Documents config does not exist yet.
 
 The `Start with Windows` setting is stored in the current user's Windows startup registry key:
 

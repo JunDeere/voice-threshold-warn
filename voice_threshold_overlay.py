@@ -17,8 +17,11 @@ from PIL import Image, ImageDraw
 
 APP_NAME = "Voice Threshold Overlay"
 STARTUP_APP_NAME = "VoiceThresholdOverlay"
-CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), APP_NAME)
+DOCUMENTS_DIR = os.path.join(os.path.expanduser("~"), "Documents")
+CONFIG_DIR = os.path.join(DOCUMENTS_DIR, APP_NAME)
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
+LEGACY_CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), APP_NAME)
+LEGACY_CONFIG_PATH = os.path.join(LEGACY_CONFIG_DIR, "config.json")
 STARTUP_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 DEFAULT_CONFIG = {
@@ -40,8 +43,9 @@ SWP_SHOWWINDOW = 0x0040
 
 
 def load_config():
+    source_path = CONFIG_PATH if os.path.exists(CONFIG_PATH) else LEGACY_CONFIG_PATH
     try:
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(source_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         data = {}
@@ -49,6 +53,10 @@ def load_config():
     config = json.loads(json.dumps(DEFAULT_CONFIG))
     config.update({k: v for k, v in data.items() if k != "overlay"})
     config["overlay"].update(data.get("overlay", {}))
+
+    if source_path == LEGACY_CONFIG_PATH and data:
+        save_config(config)
+
     return config
 
 
